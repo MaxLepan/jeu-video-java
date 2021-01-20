@@ -1,0 +1,535 @@
+// https://processing.org/reference/ArrayList.html
+int screenWidth=500;
+int screenHeight=726;
+PImage background;
+PImage enemySprite;
+PImage badBulletSprite;
+color RED=color(#FF0000);
+ArrayList<Mob> monsters = new ArrayList<Mob>(0);
+int baseMonstersNumber=100; //Combien il y'avait d'ennemi au début de la vague ?
+int mobsLife;
+int mobsSpeed;
+boolean gamestarted=false;
+
+//Variables globales de Max 
+PImage vaisseau1;
+PImage vaisseau2;
+PImage vaisseau3;
+PImage laser1;
+PImage laser2;
+PImage[] spritesLaser;
+PImage[] sprites;
+float frame;
+float frameLaser;
+int fLaser;
+int f;
+int drawCount;
+int timer = 80;
+float laserY = 730;
+boolean tir = false;
+float laserX;
+
+//Variables globales de Arthur
+int score;
+int y;
+int x;
+int x1;
+int y1;
+int h;
+int j;
+int h1;
+int h2;
+int yastero;      //coordonné y des astéroides
+int xastero1;      //coordonné x du premier asteroide
+int xastero2;      //coordonné x du deuxième asteroide
+int xastero3;      //coordonné x du troisième astroide
+int contact;
+int contact1;
+int contact2;
+int couleur;
+int vies;
+PImage asteroide;
+PImage asteroide1;
+PImage asteroide2;
+PImage asteroide3;
+
+void setup(){
+  frameRate(60);
+  size(500,726);
+  frame = 0;
+  background = loadImage("background.png");
+  sprites = new PImage[3];
+  spritesLaser = new PImage[2];
+  sprites[0] = loadImage("vaisseau_joueur_1.png");
+  sprites[1] = loadImage("vaisseau_joueur_2.png");
+  sprites[2] = loadImage("vaisseau_joueur_3.png");
+  spritesLaser[0] = loadImage("laser_joueur_1.png");
+  spritesLaser[1] = loadImage("laser_joueur_2.png");
+  text("Tap to start",50,400);
+  
+  //Setup de Arthur
+  asteroide=loadImage("Asteroide1.png");
+  asteroide1=loadImage("Asteroide2.png");
+  asteroide2=loadImage("Asteroide3.png");
+  asteroide3=loadImage("AsteroidePlus.png");
+  y=110;
+  x=110;
+  y1=110;
+  x1=110;
+  yastero=300;
+  xastero1=300;
+  xastero2=400;
+  xastero3=500;
+  h=xastero1+15;
+  j=yastero+15;
+  h1=xastero2+15;
+  h2=xastero3+15;
+  contact=0;
+  contact1=0;
+  contact2=0;
+  couleur=#00FF00;
+  vies=7;
+  score=0;
+  textSize(20);
+}
+
+void draw(){
+  if(gamestarted)
+  {
+   gameUpdate();
+  }
+  
+  if(gamestarted)
+  {
+   //background(color(0,0,0));
+   image(background,0,0);
+   fill(color(0,0,255));
+   gameDraw();
+   fill(color(255,255,255));
+   text(vies+"/7",width/2,20);
+   text("score :"+score,350,20);
+  }
+}
+
+void gameUpdate(){  
+  //ellipse(mouseX,mouseY,10,10); //Rond pour uter les ennemies (pour tester)
+  hitboxLaser();
+  hitboxPlayer();
+  updateMobs();
+  
+  if(contact==1){
+    couleur=#00FF00;
+  }
+    if(contact==2){
+    couleur=#00FF00;
+  }
+    if(contact==3){
+    couleur=color(0,0,0,255);
+    h=-1000;
+    j=-1000;
+  }
+  if(contact1==1){
+    couleur=#00FF00;
+  }
+    if(contact1==2){
+    couleur=#00FF00;
+  }
+    if(contact1==3){
+    couleur=color(0,0,0,255);
+    h1=-1000;
+    j=-1000;
+  }
+  if(contact2==1){
+    couleur=#00FF00;
+  }
+    if(contact2==2){
+    couleur=#00FF00;
+  }
+    if(contact2==3){
+    couleur=color(0,0,0,255);
+    h2=-1000;
+    j=-1000;
+  }
+
+  updateShields();
+}
+
+void gameDraw(){
+  timer();
+  if (tir){
+    firePlayer();
+  }
+  playerDraw();
+  drawMobs(); 
+  drawHealth();
+  drawShield();
+  drawShield1();
+  drawShield2();
+}
+
+void updateMobs(){  
+  //APPEL LE UPDATE DE CHAQUE MOB
+  for(int i=0;i<monsters.size();i++)
+  {
+    //print(i);
+    //print(monsters[i].x);
+    Mob monster=monsters.get(i);
+    //print(monster.xspd+" ");
+    monster.updateMob(i);   
+  } 
+  //println("");
+}
+
+void drawMobs(){
+  for(int i=0;i<monsters.size();i++)
+  {
+    //print(i);
+    //print(monsters[i].x);
+    Mob monster=monsters.get(i);
+    monster.drawMob(i);    
+  } 
+}
+
+void createMobs(int columns,int rows,float speed,int life){
+  for(float row=0;row<rows;row++) //Creation des monstres par colonne et ligne
+  {
+    for(float column=0;column<columns;column++)
+    {
+      int mobWidth=enemySprite.width;
+      int mobHeight=enemySprite.height;
+      Mob tempMob=new Mob(column*(mobWidth+5),row*(mobHeight+5),enemySprite,life,speed,0);
+      monsters.add(tempMob);
+    }
+  }
+  baseMonstersNumber=monsters.size();
+}
+
+class Mob{
+  float x;
+  float y;
+  int life;
+  float xspd;
+  float yspd;
+  float xProjectile;
+  float yProjectile=-50;
+  float xspdProjectile=0;
+  int yspdProjectile=0;
+  int ystep;
+  boolean moveTogether=true;
+  int mobWidth;
+  int mobHeight;
+  PImage sprite;
+  PImage bulletSprite;
+  int projectileWidth;
+  int projectileHeight;
+  int pRadius=8;
+  
+  Mob(float tempx, float tempy, PImage tempsprite,int templife,float tempxspd,float tempyspd)
+  {
+    x=tempx;
+    y=tempy;
+    sprite=tempsprite;
+    bulletSprite=badBulletSprite;
+    life=templife;
+    xspd=tempxspd;
+    yspd=tempyspd;
+    mobWidth=sprite.width;
+    mobHeight=sprite.height;
+    projectileWidth=bulletSprite.width;
+    projectileHeight=bulletSprite.height;
+    ystep=mobHeight/2;
+  }
+  
+  void updateMob(int currentRank){
+    x=x+xspd; //Il se deplace
+    y=y+yspd;
+    if(x<0 || x+mobWidth>screenWidth) //Si touche un mur se retourne et retourne les autres
+    {  
+      if(moveTogether){
+        for(int i=0;i<monsters.size();i++){          
+           Mob monster=monsters.get(i);
+           monster.xspd=-monster.xspd;
+           monster.y=monster.y+ystep;
+           if(i<=currentRank){
+             monster.x=monster.x+2*monster.xspd; //Donne un boost a ceux avant lui dans le array list pour rattraper le retard
+           }
+        }
+      }
+      else {
+        xspd=-xspd;
+        y=y+ystep;   
+      }
+    }
+    
+    
+    // REGARDE SI LE MOB SE FAIT TOUCHER
+    for(int i=0;i<mobWidth;i+=5){ //Regarde sur toute la longueur
+     if(get(int(x)+i,int(y)+mobHeight)==color(#0000FF)){ //Regarde en bas sur toute la longueur
+      life--;      //Si le pixel actuellement regardé est bleu, alors il meurt
+      laserY=-10000;//Il teleporte le laser qu'il a touché hors de l'écran, pour plus se fqire toucher
+      break; //Sort de la boucle pour ne pas tuer accidentelement ses voisins
+     }
+    }
+    
+    //REGARDE SI IL EST MORT
+    if(life<=0){
+      /*for(int i=0;i<monsters.size();i++){
+        Mob monster=monsters.get(i);
+        if(monster.xspd>0){
+          monster.xspd+=0.1;
+          if(i<=currentRank){
+             monster.x+=0.1;
+           }
+        }
+        else{
+          monster.xspd-=0.1;
+          if(i<=currentRank){
+             monster.x-=0.1;
+           }
+        }
+      }*/
+      score=score+15;//REGARDE ARTHUR C'EST ICI LE BORDEL QUAND LE MOB MEURT (pour le score)
+      monsters.remove(currentRank); //Se sort du ArrayList
+      if(monsters.size()<=0){ //Si était le dernier, creer la nouvelle vague
+        mobsLife++;
+        mobsSpeed++;
+        createMobs(8,6,mobsSpeed,1);
+      }  
+    }
+     
+    // TIRE A DES MOMENTS ALEATOIRE
+    if(int(random(800))==1 && yspdProjectile==0){
+      fireMob();
+    }
+    // LES PROJECTILES
+    if(yspdProjectile>0){
+       yProjectile+=yspdProjectile;
+       xProjectile+=xspdProjectile;
+       if(yProjectile>screenHeight+50) yspdProjectile=0;
+       fill(color(#FF0000));
+       noStroke();
+       ellipse(xProjectile-pRadius,yProjectile-pRadius,2*pRadius,2*pRadius);
+       
+       if(get(int(xProjectile+8),int(yProjectile+8))==color(#00FF00)){ //Regarde si le projectile touche un asteroide
+         yProjectile=0;
+         yspdProjectile=0;
+       }
+       
+       if(get(int(xProjectile+8),int(yProjectile+8))==color(#FFFF00)){ //Regarde si le projectile touche le joueur
+         //REGARDE ICI ARTHUR TU FAIT TON BORDEL SI LE JOUEUR SE FAIT TOUCHER
+         yProjectile=0;
+         yspdProjectile=0;
+         vies--;
+       }
+    }
+    
+    //REGARDE SI IL ATTEINT LE BAS
+    if(y+mobHeight>screenHeight){ //Perd le jeu et le remet en place pour la prochaine game
+      gamestarted=false;
+      background(#CCCCCC);
+      fill(#FFFFFF);
+      text("Tap to start",50,400);
+      monsters = new ArrayList<Mob>(0);
+      sprites = new PImage[3];
+      spritesLaser = new PImage[2];
+      sprites[0] = loadImage("vaisseau_joueur_1.png");
+      sprites[1] = loadImage("vaisseau_joueur_2.png");
+      sprites[2] = loadImage("vaisseau_joueur_3.png");
+      spritesLaser[0] = loadImage("laser_joueur_1.png");
+      spritesLaser[1] = loadImage("laser_joueur_2.png");
+    } 
+  }
+  
+  void drawMob(int currentRank){
+     image(sprite,x,y);
+     //BULLET 
+     image(badBulletSprite,xProjectile-pRadius-int(0.5*projectileWidth),yProjectile-pRadius-int(0.5*projectileHeight));
+  }
+  
+  void fireMob(){
+     xProjectile=x+0.5*float(mobWidth);
+     yProjectile=y+0.5*float(mobHeight);
+     yspdProjectile=5;
+  }
+}
+
+void mousePressed() {
+  if(gamestarted==false){
+    enemySprite=loadImage("badguy.png");
+    badBulletSprite=loadImage("badBullet.png");
+    createMobs(6,4,1,1); 
+    mobsLife=1;
+    mobsSpeed=1;
+    
+    //Setup de Arthur
+    y=110;
+    x=110;
+    y1=110;
+    x1=110;
+    yastero=500;
+    xastero1=000;
+    xastero2=200;
+    xastero3=400;
+    h=xastero1+15;
+    j=yastero+15;
+    h1=xastero2+15;
+    h2=xastero3+15;
+    contact=0;
+    contact1=0;
+    contact2=0;
+    couleur=#00FF00;
+    vies=7;
+    gamestarted=true;
+  }
+}
+
+void keyPressed() {  
+  if (key == 'e' || key == 'E'){ //fait quitter la fenêtre
+  exit();
+  }
+}
+
+//LES FONCTIONS DE MAX 
+void timer(){
+  timer = timer - 1;
+  if (timer <= 0){
+    tir = true;
+    laserX = mouseX;
+    timer = 80;
+  }
+  
+}
+
+void firePlayer() {  
+  if (frameLaser > 2) frameLaser = 0; //frames d'animation du laser
+
+  pushMatrix();
+  fLaser = int(frameLaser);
+  image(spritesLaser[fLaser], laserX-20, laserY, 15, 47.5);
+  frameLaser = frameLaser + 0.05;
+  laserY = laserY - 10;
+  translate(0, laserY);
+  popMatrix();
+
+  if (laserY < 0) {  //retour du laser à sa position initiale quand le laser touche le haut
+    tir = false;
+    laserY = 730;
+  }
+}
+
+void hitboxLaser() {
+  fill(#0000FF);
+  rect(laserX-20, laserY, 15, 47.5);
+}
+
+void hitboxPlayer() {
+  fill(#FFFF00);
+  rect(mouseX-57, 600, 115, 165);
+}
+
+void playerDraw() {
+  if (frame > 3) frame = 0; //frames d'animation du vaisseau joueur
+  f = int(frame);
+  image(sprites[f], mouseX-57, 600, 115, 165);
+  frame = frame + 0.05;
+}
+
+//Fonctions de Arthur
+void drawHealth(){
+ if (vies==0){
+   exit();   
+ }
+}
+
+void drawShield(){
+  if (contact==0 &&contact<1){
+  image(asteroide,xastero1,yastero,100,100);
+  }
+  if (contact==1 && contact<2){
+  image(asteroide1,xastero1,yastero,100,100); 
+  }
+  if (contact==2 && contact<3){
+  image(asteroide2,xastero1,yastero,100,100); 
+  }
+  if (contact==3 && contact<4){
+  image(asteroide3,xastero1,yastero,100,100); 
+  }
+}
+
+void drawShield1(){
+  if (contact1==0 &&contact1<1){
+  image(asteroide,xastero2,yastero,100,100);
+  }
+  if (contact1==1 && contact1<2){
+  image(asteroide1,xastero2,yastero,100,100); 
+  }
+  if (contact1==2 && contact1<3){
+  image(asteroide2,xastero2,yastero,100,100); 
+  }
+  if (contact1==3 && contact1<4){
+  image(asteroide3,xastero2,yastero,100,100); 
+  }
+}
+
+void drawShield2(){
+  if (contact2==0 &&contact2<1){
+  image(asteroide,xastero3,yastero,100,100);
+  }
+  if (contact2==1 && contact2<2){
+  image(asteroide1,xastero3,yastero,100,100); 
+  }
+  if (contact2==2 && contact2<3){
+  image(asteroide2,xastero3,yastero,100,100); 
+  }
+  if (contact2==3 && contact2<4){
+  image(asteroide3,xastero3,yastero,100,100); 
+  }
+}
+
+void updateShields(){
+  fill(#FF0000);
+  //ellipse(x,y,x1,y1);    //correspond au tir ennemi
+  noStroke();
+  fill(couleur);
+  
+  for(int i=0;i<71; i+=1){
+    if (get(int(h)+i,int(j))==color(#FF0000)){
+    background(0,0,0);
+    y=110;
+    x=110;
+    y1=110;
+    x1=110;
+    fill(couleur);
+    contact++;   
+  }}
+  
+    for(int i=0;i<71; i+=1){
+    if (get(int(h1)+i,int(j))==color(#FF0000)){
+    background(0,0,0);
+    y=110;
+    x=110;
+    y1=110;
+    x1=110;
+    fill(couleur);
+    contact1++;   
+  }}
+  
+    for(int i=0;i<71; i+=1){
+    if (get(int(h2)+i,int(j))==color(#FF0000)){
+    background(0,0,0);
+    y=110;
+    x=110;
+    y1=110;
+    x1=110;
+    fill(couleur);
+    contact2++;   
+  }}
+
+    if(contact<=3){
+    rect(h,j,71,10);}
+    if(contact1<=3){
+    rect(h1,j,71,10);}
+    if(contact2<=3){
+    rect(h2,j,71,10);}
+    //print(contact);
+}
